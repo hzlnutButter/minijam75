@@ -1,4 +1,3 @@
-from os import system
 import time
 from random import randint
 import curses
@@ -8,13 +7,13 @@ head_side = [
     "   /\  /   \ ",
     "  /  \/ o __\\",
     " /       /  |",
-    "/       |__/ "]
+    "/       |__/"]
 head_speak = [
     "    _______  ",
     "   /\  /   \ ",
     "  /  \/ o __\\",
     " /       //  ",
-    "/       |_\_ "]
+    "/       |_\_"]
 head_front = [
     " ___________ ",
     "|  /     \  |",
@@ -30,11 +29,11 @@ head_tilt = [
 body = [
     "|_________",
     "|                 /",
-    "|                / ",
-    "|    /          /  ",
-    "|  _/\_______| |   ",
-    "| |          | |   ",
-    "|_|          |_|   "]
+    "|                /",
+    "|    /          /",
+    "|  _/\_______| |",
+    "| |          | |",
+    "|_|          |_|"]
 tail_normal = [
     "          ",
     "  ___     ",
@@ -46,45 +45,38 @@ tail_big = [
     "|        |",
     "|     \_/ ",]
 
-width = 100 # width and height must be even
-height = 50
-background = []
+width, height = 100, 50
+score_box_height, score_box_width = 5, 30
+background, pug = [], []
 pug_traits = {"facing": "R", "head": head_side, "tail": tail_normal}
-pug = []
 pug_location = int(width/2) - 12
-intro = ["Once there was a puppy who was gliding through the sky",
-    "Fearless, he did not observe he had not wings to fly",
-    "Looking down, he saw below the quickly gaining ground",
-    "Still unfazed, along the way, he ate each treat he found..."]
-bones_captured = 0
-bones_missed = 0
-best_accuracy = 0
-goal_bones = 20
-goal_loop_ms = 100
-speak_time = None
+mass, highest_mass = 10, 10
+distance = 100
+loop_delay, mouth_delay = .1, 0
 
 class Bone():
     registry = []
     def __init__(self):
-        self.text = "8=8"
+        if randint(1, 5) == 1:
+            self.text = "8===8"
+            self.mass = 1
+        else:
+            self.text = "8=8"
+            self.mass = .5
         self.location = randint(1, width-3)
-        self.current_row = height
+        self.row = height
         self.registry.append(self)
     def capture(self):
-        global bones_captured, goal_loop_ms, speak_time, pug_traits
-        bones_captured += 1
+        global loop_delay, mouth_delay, pug_traits, mass
+        mass += self.mass
         pug_traits["head"] = head_speak
-        speak_time = time.time()
-        if bones_captured == int(goal_bones * .2):
-            goal_loop_ms += -30
-        elif bones_captured == int(goal_bones * .4):
-            goal_loop_ms += -10
-        elif bones_captured == int(goal_bones * .65):
-            goal_loop_ms += -10
+        mouth_delay = time.time()
         self.registry.remove(self)
+        if mass > 22:
+            loop_delay = .05
+        elif mass > 17:
+            loop_delay = .075
     def miss(self):
-        global bones_missed
-        bones_missed += 1
         self.registry.remove(self)
 
 def delay_print(output, window, y, x):
@@ -99,24 +91,17 @@ def delay_print(output, window, y, x):
 def update_background():
     global background
     if background:
-        if "*" in background[0]:
-            new_line = width * " "
+        if background[0] > 0 or background[1] > 0:
+            addition = 0
         else:
-            spaces_before = randint(1, width-1)
-            spaces_after = width - 1 - spaces_before
-            new_line = (" " * spaces_before) + "*" + (" " * spaces_after)
+            addition = randint(2, width-1)
         background.remove(background[0])
-        background.append(new_line)
-        for x in range(len(background)):
-            if "_" in background[x]:
-                background[x] = background[x].replace("_", " ")
-                break
+        background.append(addition)
     else:
-        for x in range(int(height/2)):
-            spaces_before = randint(1, width-1)
-            spaces_after = width - 1 - spaces_before
-            background.append((" " * spaces_before) + "*" + (" " * spaces_after))
-            background.append(width * " ")
+        for y in range(int(height/3)):
+            index = randint(2, width-1)
+            for addition in [index, 0, 0]:
+                background.append(addition)
 
 def update_pug(traits):
     global pug_traits, pug
@@ -148,55 +133,47 @@ def main():
 
 def game(win):
     # setup
-    global pug_location, pug_traits, best_accuracy, background, bones_missed, bones_captured, goal_loop_ms, speak_time
+    global pug_location, pug_traits, background, loop_delay, mouth_delay, mass, highest_mass, distance
     curses.noecho()
     curses.curs_set(0)
     curses.cbreak(True)
     window = curses.newwin(height+2, width+2)
     window.nodelay(True)
-    # intro
-    # delay_print(intro[0], window, 4, 5)
-    # time.sleep(.5)
-    # delay_print(intro[1], window, 5, 5)
-    # time.sleep(.5)
-    # delay_print(intro[2], window, 6, 5)
-    # time.sleep(.5)
-    # delay_print(intro[3], window, 7, 5)
-    # time.sleep(1.5)
+    # intro = ["Once, a pug was cast from Earth to fly through outer space", "Lost without a way back home, he sought a brand new place", "Small he was - too light to feel the pull of gravity", "Without treats to weigh him down - help find them, rapidly!"]
+    # for i in range(len(intro)):
+    #     delay_print(intro[i], window, 4+i, 5)
+    #     time.sleep(.5)
+    # time.sleep(1)
     while True:
-        window.addstr(9, 5, "HOW TO PLAY: Eat " + str(goal_bones) + " bones before you hit the ground!", curses.A_BOLD)
-        window.addstr(11, 5, "COMMANDS: move left -> A")
-        window.addstr(12, 15, "move right -> D")
-        window.addstr(13, 15, "pause -> SPACE")
-        window.addstr(14, 15, "restart -> RETURN")
-        window.addstr(16, 5, "PRESS RETURN TO BEGIN", curses.A_BOLD)
-        window.nodelay(False)
-        while True:
-            key = window.getch()
-            if key == 10:
-                break
-        window.nodelay(True)
         background = []
         pug_traits = {"facing": "R", "head": head_side, "tail": tail_normal}
         pug_location = int(width/2) - 12
-        bones_captured = 0
-        bones_missed = 0
-        goal_loop_ms = 100
-        while bones_captured < goal_bones and bones_missed < goal_bones:
-            start_time_ms = int(time.time() * 1000)
+        mass = 10
+        distance = 100
+        loop_delay = .1
+        menu_lines = [("Eat as many bones as you can on your way to Mars, " + str(distance) + " million kilometres away."), "You need to be at least 30 kg, or else the planet's gravitational pull will be too weak.", "Big bones (8===8) are twice as heavy as small bones (8=8).", "", "COMMANDS: move left -> A", "          move right -> D", "          pause -> SPACE", "          restart -> RETURN", "", "PRESS RETURN TO BEGIN"]
+        for i in range(len(menu_lines)):
+            window.addstr(9+i, 5, menu_lines[i])
+        window.nodelay(False)
+        while window.getch() != 10:
+            continue
+        window.nodelay(True)
+        while distance > 0:
+            start_time = time.time()
             key = window.getch()
             if key == 32: # space (pause)
                 window.nodelay(False)
-                key = window.getch()
+                while window.getch() != 32:
+                    continue
                 window.nodelay(True)
             elif key == 10: # return (restart)
                 break
-            if key == 97: # a
+            elif key == 97 or key == 65: # a or A
                 pug_location += -5
                 pug_traits["facing"] = "L"
                 if pug_location < 1:
                     pug_location = 1
-            elif key == 100: # d
+            elif key == 100 or key == 68: # d or D
                 pug_location += 5
                 pug_traits["facing"] = "R"
                 if pug_location > (width-23):
@@ -204,78 +181,61 @@ def game(win):
             update_background()
             update_pug(pug_traits)
             window.clear()
-            # background
-            for y in range(len(background)):
-                window.addstr(y+1, 1, background[y])
-            # pug
+            for y in range(len(background)): # background
+                if background[y] > 0:
+                    window.addstr(y+1, background[y], "*")
+            if randint(1, 20) == 10: # update bones
+                new_bone = Bone()
+            for bone in Bone.registry:
+                if bone.row > 5 and bone.row < 11:
+                    if pug_traits["facing"] == "R":
+                        if bone.location > pug_location+12 and bone.location < pug_location+24:
+                            bone.capture()
+                    elif pug_traits["facing"] == "L":
+                        if bone.location > pug_location-4 and bone.location < pug_location+10:
+                            bone.capture()
+            if pug_traits["head"] == head_speak and (time.time() - mouth_delay >= .2): # pug
+                pug_traits["head"] = head_side
+                mouth_delay = 0        
             if pug_traits["facing"] == "R":
                 for y in range(11):
-                    window.addstr((y+5), pug_location+1, pug[y])
+                    window.addstr((y+6), pug_location+1, pug[y])
             elif pug_traits["facing"] == "L":
-                for y in range(5):
-                    window.addstr((y+5), pug_location+1, pug[y])
-                for y in range(6):
-                    window.addstr((y+10), (pug_location+5), pug[y+5])
-            # bone
-            if randint(1, 25) == 10:
-                bone = Bone()
-            for each_bone in Bone.registry:
-                if each_bone.current_row > 4 and each_bone.current_row < 11:
-                    if pug_traits["facing"] == "R":
-                        if each_bone.location > (pug_location + 10) and each_bone.location < (pug_location + 24):
-                            each_bone.capture()
-                    elif pug_traits["facing"] == "L":
-                        if each_bone.location > (pug_location - 4) and each_bone.location < (pug_location + 10):
-                            each_bone.capture()
-                window.addstr(each_bone.current_row, each_bone.location, each_bone.text, curses.A_BOLD)
-                each_bone.current_row += -1
-                if each_bone.current_row < 1:
-                    each_bone.miss()
-            if pug_traits["head"] == head_speak:
-                if time.time() - speak_time >= .2:
-                    pug_traits["head"] = head_side
-                    speak_time = None
-            # score
-            score_box_height = 6
-            score_box_width = 20
-            window.addstr(height-score_box_height, width-score_box_width, ("_" * (score_box_width+1)))
+                for y in range(4):
+                    window.addstr(y+6, pug_location+1, pug[y])
+                window.addstr(10, pug_location+2, pug[4])
+                for y in range(4):
+                    window.addstr(y+11, (pug_location+5+y), pug[y+5])
+                for y in range(2):
+                    window.addstr(y+15, pug_location+8, pug[9+y])
+            for bone in Bone.registry: # place bones
+                window.addstr(bone.row, bone.location, bone.text, curses.A_BOLD)
+                bone.row += -1
+                if bone.row < 1:
+                    bone.miss()
+            distance += -.1 # score
+            window.addstr(score_box_height, width-score_box_width, ("_" * (score_box_width+1)))
             for x in range(score_box_height):
-                window.addstr(height-x, width-score_box_width, "|")
-            window.addstr(height-4, width-17, ("BONES: " + str(bones_captured)), curses.A_BOLD)
-            window.addstr(height-3, width-17, ("MISSED: " + str(bones_missed)), curses.A_BOLD)
-            window.addstr(height-2, width-17, ("WEIGHT: " + str(20+bones_captured) + " lbs"), curses.A_BOLD)
-            if best_accuracy > 0:
-                window.addstr(height-1, width-17, ("HIGH SCORE: " + str(best_accuracy) + "%"), curses.A_BOLD)
+                window.addstr(x+1, width-score_box_width, "|")
+            window.addstr(2, width-27, ("MASS: " + str(mass) + " kg"), curses.A_BOLD)
+            window.addstr(3, width-27, ("DISTANCE: " + str(int(distance)) + " million km"), curses.A_BOLD)
+            if highest_mass > 10:
+                window.addstr(4, width-27, ("HIGH SCORE: " + str(highest_mass) + " kg"), curses.A_BOLD)
             window.border(0)
             window.refresh()
-            # time stuff
-            while True:
-                end_time_ms = int(time.time() * 1000)
-                time_elapsed_ms = end_time_ms - start_time_ms
-                if time_elapsed_ms >= goal_loop_ms:
-                    break
+            while time.time() - start_time < loop_delay:
+                continue
         # post-game
-        for each_bone in Bone.registry:
-            each_bone.registry.remove(each_bone)
-        if bones_captured >= goal_bones:
-            window.clear()
-            try:
-                accuracy_rate = int(bones_captured / (bones_captured + bones_missed) * 100)
-            except ZeroDivisionError:
-                accuracy_rate = 0
-            if accuracy_rate > best_accuracy:
-                window.addstr(4, 5, "NEW HIGH SCORE!", curses.A_BOLD)
-                best_accuracy = accuracy_rate
-            window.addstr(5, 5, ("You got " + str(bones_captured) + " bones, and you missed " + str(bones_missed) + ". Your accuracy rate was " + str(accuracy_rate) + "%."))
-        else: # you lose
+        mars = ["   ____", " /      \\", "(  MARS  )", " \ ____ /"]
+        for bone in Bone.registry:
+            bone.registry.remove(bone)
+        if distance > 0: # you didn't make it
             update_pug({"head": head_front})
-            time.sleep(.5)
-            for i in range(height-18):
+            for i in range(height):
+                start_time = time.time()
                 window.clear()
-                # background
                 for y in range(len(background)):
-                    window.addstr(y+1, 1, background[y])
-                # pug
+                    window.addstr(y+1, background[y], "*")
                 try:
                     if pug_traits["facing"] == "R":
                         for y in range(11):
@@ -283,24 +243,101 @@ def game(win):
                     elif pug_traits["facing"] == "L":
                         for y in range(5):
                             window.addstr((y+5+(int(i*i/2))), pug_location+1, pug[y])
-                        for y in range(6):
-                            window.addstr((y+10+(int(i*i/2))), (pug_location+5), pug[y+5])
+                        for y in range(3):
+                            window.addstr((y+10+(int(i*i/2))), (pug_location+5+y), pug[y+5])
+                        for y in range(3):
+                            window.addstr((y+13+(int(i*i/2))), (pug_location+8), pug[y+8])
                 except Exception:
                     break
-                # score
-                score_box_height = 5
-                score_box_width = 20
-                window.addstr(height-score_box_height, width-score_box_width, ("_" * (score_box_width+1)))
-                for x in range(score_box_height):
-                    window.addstr(height-x, width-score_box_width, "|")
-                window.addstr(height-3, width-17, ("BONES: " + str(bones_captured)), curses.A_BOLD)
-                window.addstr(height-2, width-17, ("MISSED: " + str(bones_missed)), curses.A_BOLD)
-                if best_accuracy > 0:
-                    window.addstr(height-1, width-17, ("HIGH SCORE: " + str(best_accuracy) + "%"), curses.A_BOLD)
                 window.border(0)
                 window.refresh()
-                time.sleep(.1)
-            window.clear()
-            window.addstr(4, 5, "You only got " + str(bones_captured) + " bones before you crashed :(")
+                while time.time() - start_time < .1:
+                    continue
+            display_text = "YOU LOST: YOU WERE STILL " + str(int(distance)) + " KM AWAY FROM MARS!"
+        elif mass < 30: # not heavy enough
+            update_pug({"head": head_front})
+            xval, yval = 40, height-3
+            for i in range(14):
+                start_time = time.time()
+                window.clear()
+                for y in range(len(background)):
+                    window.addstr(y+1, background[y], "*")
+                if pug_traits["facing"] == "R":
+                    for y in range(11):
+                        window.addstr((y+6), pug_location+1, pug[y])
+                elif pug_traits["facing"] == "L":
+                    for y in range(5):
+                        window.addstr(y+6, pug_location+1, pug[y])
+                    for y in range(4):
+                        window.addstr(y+11, (pug_location+5+y), pug[y+5])
+                    for y in range(2):
+                        window.addstr(y+15, pug_location+8, pug[9+y])
+                if i == 0:
+                    window.addstr(height, 25, mars[0])
+                elif i == 1:
+                    window.addstr(height-2, 30, mars[0])
+                    window.addstr(height-1, 30, mars[1])
+                elif i == 2:
+                    window.addstr(height-4, 35, mars[0])
+                    window.addstr(height-3, 35, mars[1])
+                    window.addstr(height-2, 35, mars[2])
+                else:
+                    try:
+                        window.addstr(yval-3, xval, mars[0])
+                        window.addstr(yval-2, xval, mars[1])
+                        window.addstr(yval-1, xval, mars[2])
+                        window.addstr(yval, xval, mars[3])
+                        xval += 5
+                        yval += -2
+                    except Exception:
+                        break
+                window.border(0)
+                window.refresh()
+                while time.time() - start_time < .15:
+                    continue
+            display_text = "YOU LOST: YOU WERE ONLY " + str(mass) + " KG, AND MARS'S GRAVITATIONAL PULL WAS TOO WEAK."
+        else: # win
+            update_pug({"head": head_front})
+            yval = height-3
+            for i in range(int((height-15) / 2)):
+                start_time = time.time()
+                window.clear()
+                for y in range(len(background)):
+                    window.addstr(y+1, background[y], "*")
+                if pug_traits["facing"] == "R":
+                    for y in range(11):
+                        window.addstr((y+6), pug_location+1, pug[y])
+                elif pug_traits["facing"] == "L":
+                    for y in range(5):
+                        window.addstr(y+6, pug_location+1, pug[y])
+                    for y in range(4):
+                        window.addstr(y+11, (pug_location+5+y), pug[y+5])
+                    for y in range(2):
+                        window.addstr(y+15, pug_location+8, pug[9+y])
+                if i == 0:
+                    window.addstr(height, pug_location, mars[0])
+                elif i == 1:
+                    window.addstr(height-2, pug_location, mars[0])
+                    window.addstr(height-1, pug_location, mars[1])
+                elif i == 2:
+                    window.addstr(height-4, pug_location, mars[0])
+                    window.addstr(height-3, pug_location, mars[1])
+                    window.addstr(height-2, pug_location, mars[2])
+                else:
+                    window.addstr(yval-3, pug_location, mars[0])
+                    window.addstr(yval-2, pug_location, mars[1])
+                    window.addstr(yval-1, pug_location, mars[2])
+                    window.addstr(yval, pug_location, mars[3])
+                    yval += -2
+                window.border(0)
+                window.refresh()
+                while time.time() - start_time < .15:
+                    continue
+            display_text = "CONGRATULATIONS, YOU MADE IT TO MARS! NOW YOU CAN MAKE A NEW HOME."
+        window.clear()
+        if mass > highest_mass:
+            window.addstr(6, 5, ("NEW HIGH SCORE: " + str(mass)), curses.A_BOLD)
+            highest_mass = mass
+        window.addstr(5, 5, display_text, curses.A_BOLD)
 
 main()
